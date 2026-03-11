@@ -1,0 +1,177 @@
+# 1. SERVICIOS (Red interna DNS de Kubernetes)
+apiVersion: v1
+kind: Service
+metadata: { name: mysql }
+spec:
+  selector: { app: mysql }
+  ports: [{ port: 3306 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: slurmctld }
+spec:
+  selector: { app: slurmctld }
+  ports: [{ port: 6817 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: c1 }
+spec: { selector: { app: c1 }, ports: [{ port: 6818 }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: c2 }
+spec: { selector: { app: c2 }, ports: [{ port: 6818 }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: c3 }
+spec: { selector: { app: c3 }, ports: [{ port: 6818 }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: c4 }
+spec: { selector: { app: c4 }, ports: [{ port: 6818 }] }
+---
+# 2. BASE DE DATOS (MariaDB)
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: mysql-deployment }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: mysql } }
+  template:
+    metadata: { labels: { app: mysql } }
+    spec:
+      containers:
+      - name: mysql
+        image: mariadb:10.10
+        env:
+        - name: MYSQL_RANDOM_ROOT_PASSWORD
+          value: "yes"
+        - name: MYSQL_DATABASE
+          value: "slurm_acct_db"
+        - name: MYSQL_USER
+          value: "slurm"
+        - name: MYSQL_PASSWORD
+          value: "password"
+---
+# 3. CONTROLADOR (Slurmctld)
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: slurmctld-deployment }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: slurmctld } }
+  template:
+    metadata: { labels: { app: slurmctld } }
+    spec:
+      hostname: slurmctld
+      initContainers:
+      - name: copy-munge-key
+        image: busybox
+        command: ['sh', '-c', 'cp /tmp/munge/munge.key /etc/munge/munge.key && chmod 400 /etc/munge/munge.key']
+        volumeMounts:
+        - name: secret-munge
+          mountPath: /tmp/munge
+        - name: etc-munge
+          mountPath: /etc/munge
+      containers:
+      - name: slurmctld
+        image: giovtorres/slurm-docker-cluster:latest
+        command: ["/bin/bash", "-c"]
+        args: ["mkdir -p /var/lib/slurm /var/run/slurm /var/spool/slurmctld /var/spool/slurm /var/log/slurm /var/log/munge /var/run/munge /var/lib/munge && chown -R slurm:slurm /var/lib/slurm /var/run/slurm /var/spool/slurmctld /var/spool/slurm /var/log/slurm && chown -R munge:munge /etc/munge /var/log/munge /var/run/munge /var/lib/munge && munged -f && slurmctld -D"]
+        securityContext: { privileged: true }
+        volumeMounts:
+        - name: config-vol
+          mountPath: /etc/slurm/slurm.conf
+          subPath: slurm.conf
+        - name: etc-munge
+          mountPath: /etc/munge
+      volumes:
+      - name: config-vol
+        configMap: { name: slurm-config }
+      - name: secret-munge
+        secret: { secretName: munge-key }
+      - name: etc-munge
+        emptyDir: {}
+---
+# 4. NODO DE CÓMPUTO 1 (c1)
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: c1-deployment }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: c1 } }
+  template:
+    metadata: { labels: { app: c1 } }
+    spec:
+      hostname: c1
+      initContainers:
+      - name: copy-munge-key
+        image: busybox
+        command: ['sh', '-c', 'cp /tmp/munge/munge.key /etc/munge/munge.key && chmod 400 /etc/munge/munge.key']
+        volumeMounts:
+        - name: secret-munge
+          mountPath: /tmp/munge
+        - name: etc-munge
+          mountPath: /etc/munge
+      containers:
+      - name: c1
+        image: giovtorres/slurm-docker-cluster:latest
+        command: ["/bin/bash", "-c"]
+        args: ["mkdir -p /var/lib/slurm /var/run/slurm /var/spool/slurmd /var/spool/slurm /var/log/slurm /var/log/munge /var/run/munge /var/lib/munge && chown -R slurm:slurm /var/lib/slurm /var/run/slurm /var/spool/slurmd /var/spool/slurm /var/log/slurm && chown -R munge:munge /etc/munge /var/log/munge /var/run/munge /var/lib/munge && munged -f && slurmd -D"]
+        securityContext: { privileged: true }
+        volumeMounts:
+        - name: config-vol
+          mountPath: /etc/slurm/slurm.conf
+          subPath: slurm.conf
+        - name: etc-munge
+          mountPath: /etc/munge
+      volumes:
+      - name: config-vol
+        configMap: { name: slurm-config }
+      - name: secret-munge
+        secret: { secretName: munge-key }
+      - name: etc-munge
+        emptyDir: {}
+---
+# 5. NODO DE CÓMPUTO 2 (c2)
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: c2-deployment }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: c2 } }
+  template:
+    metadata: { labels: { app: c2 } }
+    spec:
+      hostname: c2
+      initContainers:
+      - name: copy-munge-key
+        image: busybox
+        command: ['sh', '-c', 'cp /tmp/munge/munge.key /etc/munge/munge.key && chmod 400 /etc/munge/munge.key']
+        volumeMounts:
+        - name: secret-munge
+          mountPath: /tmp/munge
+        - name: etc-munge
+          mountPath: /etc/munge
+      containers:
+      - name: c2
+        image: giovtorres/slurm-docker-cluster:latest
+        command: ["/bin/bash", "-c"]
+        args: ["mkdir -p /var/lib/slurm /var/run/slurm /var/spool/slurmd /var/spool/slurm /var/log/slurm /var/log/munge /var/run/munge /var/lib/munge && chown -R slurm:slurm /var/lib/slurm /var/run/slurm /var/spool/slurmd /var/spool/slurm /var/log/slurm && chown -R munge:munge /etc/munge /var/log/munge /var/run/munge /var/lib/munge && munged -f && slurmd -D"]
+        securityContext: { privileged: true }
+        volumeMounts:
+        - name: config-vol
+          mountPath: /etc/slurm/slurm.conf
+          subPath: slurm.conf
+        - name: etc-munge
+          mountPath: /etc/munge
+      volumes:
+      - name: config-vol
+        configMap: { name: slurm-config }
+      - name: secret-munge
+        secret: { secretName: munge-key }
+      - name: etc-munge
+        emptyDir: {}

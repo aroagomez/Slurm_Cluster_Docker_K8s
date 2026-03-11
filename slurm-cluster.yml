@@ -1,0 +1,87 @@
+---
+# El "Enchufe" del controlador para que los nodos lo encuentren
+apiVersion: v1
+kind: Service
+metadata:
+  name: slurmctld
+spec:
+  selector:
+    app: slurmctld
+  ports:
+    - port: 6817
+
+---
+# El Cerebro: Controlador de Slurm
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slurmctld-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: slurmctld
+  template:
+    metadata:
+      labels:
+        app: slurmctld
+    spec:
+      hostname: slurmctld
+      containers:
+        - name: slurmctld
+          image: giovtorres/slurm-docker-cluster:latest
+          command: ["/bin/sh", "-c", "sleep infinity"] # Simulación para mantener el Pod vivo en el entorno local
+          volumeMounts:
+            - name: config-vol
+              mountPath: /etc/slurm/slurm.conf
+              subPath: slurm.conf
+      volumes:
+        - name: config-vol
+          configMap:
+            name: slurm-config
+
+---
+# Nodo de Cómputo 1
+apiVersion: v1
+kind: Pod
+metadata:
+  name: c1
+  labels:
+    app: slurm-node
+spec:
+  hostname: c1
+  containers:
+    - name: slurmd
+      image: giovtorres/slurm-docker-cluster:latest
+      command: ["/bin/sh", "-c", "sleep infinity"]
+      volumeMounts:
+        - name: config-vol
+          mountPath: /etc/slurm/slurm.conf
+          subPath: slurm.conf
+  volumes:
+    - name: config-vol
+      configMap:
+        name: slurm-config
+
+---
+# Nodo de Cómputo 2
+apiVersion: v1
+kind: Pod
+metadata:
+  name: c2
+  labels:
+    app: slurm-node
+spec:
+  hostname: c2
+  containers:
+    - name: slurmd
+      image: giovtorres/slurm-docker-cluster:latest
+      command: ["/bin/sh", "-c", "sleep infinity"]
+      volumeMounts:
+        - name: config-vol
+          mountPath: /etc/slurm/slurm.conf
+          subPath: slurm.conf
+  volumes:
+    - name: config-vol
+      configMap:
+        name: slurm-config
