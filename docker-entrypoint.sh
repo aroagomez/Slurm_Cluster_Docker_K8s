@@ -4,6 +4,14 @@ set -e
 echo "---> Starting the MUNGE Authentication service (munged) ..."
 gosu munge /usr/sbin/munged
 
+if [ ! -f /etc/munge/munge.key ]; then
+    echo "---> munge.key not found, generating a new one ..."
+    /usr/sbin/mungekey --create
+    chown munge:munge /etc/munge/munge.key
+    chmod 400 /etc/munge/munge.key
+    echo "---> munge.key generated successfully."
+fi
+
 if [ "$1" = "slurmdbd" ]
 then
     echo "---> Starting the Slurm Database Daemon (slurmdbd) ..."
