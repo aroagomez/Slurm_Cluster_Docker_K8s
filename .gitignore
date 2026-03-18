@@ -68,3 +68,4 @@ docker-compose.override.yml
 rpmbuild/
 archive/
 .claude/
+munge.key 
